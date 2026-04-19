@@ -78,38 +78,6 @@ src/
 6. Select the extracted folder (it should contain `manifest.json`)
 7. The extension icon appears in your toolbar — you're ready!
 
-### Option 2: Build from Source
-
-#### Prerequisites
-- Node.js 18+
-- npm or yarn
-- Chrome 116+
-
-#### Install
-```bash
-npm install
-```
-
-#### Development Build (watch mode)
-```bash
-npm run dev
-```
-
-#### Production Build
-```bash
-npm run build:prod
-```
-
-#### Load in Chrome
-1. Open `chrome://extensions/`
-2. Enable "Developer mode"
-3. Click "Load unpacked"
-4. Select the `dist/` folder
-
-#### Run Tests
-```bash
-npm test
-```
 
 ## How It Works
 
