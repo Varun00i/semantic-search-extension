@@ -1,0 +1,18 @@
+/* Content script styles for semantic search highlights */
+.semantic-search-highlight {
+  background-color: #fef08a !important;
+  color: #000 !important;
+  padding: 2px 0 !important;
+  border-radius: 2px !important;
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.4) !important;
+  transition: background-color 0.3s ease !important;
+}
+
+.semantic-search-highlight:hover {
+  background-color: #fde047 !important;
+}
+
+.semantic-search-highlight--active {
+  background-color: #fb923c !important;
+  box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.5) !important;
+}
