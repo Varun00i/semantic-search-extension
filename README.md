@@ -123,3 +123,21 @@ src/
 ## License
 
 MIT
+
+## 2026 UI/UX & Feature Updates
+
+### April 2026
+- **Responsive Layout**: Popup and pop-out window now resize fluidly at any dimension. No more layout breakage at odd sizes.
+- **Smaller, Professional Toggles**: All toggle switches are now compact (40×24px) for a more modern, professional look.
+- **Auto-Indexing**: When enabled in Settings, the extension will automatically index any new page you visit (unless already indexed). Default is OFF for privacy.
+- **Auto-Index on Popup Open**: If auto-index is ON, opening the extension popup will also auto-index the current page if not already indexed.
+- **Immediate Settings Save**: Changing the auto-index toggle now saves instantly (no need to click Save).
+- **Build Verified**: All changes tested and built successfully.
+
+#### Suggestions for Future Improvements
+- Keyboard navigation for search results (arrow keys + Enter)
+- Search history and recent queries dropdown
+- Batch file upload (drag-and-drop multiple files)
+- Export/import all indexed data
+- Re-index pages if content changes
+- Status indicator for auto-indexing in header
