@@ -48,7 +48,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       }
 
       case 'EMBED_SINGLE': {
-        const vector = await generateEmbedding(payload.text);
+        const vector = await generateEmbedding(payload.text, payload.isQuery || false);
         // Transfer the underlying ArrayBuffer for zero-copy
         const buffer = vector.buffer.slice(0);
         postResponse({

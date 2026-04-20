@@ -88,8 +88,8 @@ export async function workerInitModel(
 /**
  * Generate a single embedding in the worker.
  */
-export async function workerEmbedSingle(text: string): Promise<Float32Array> {
-  const result = await sendRequest('EMBED_SINGLE', { text });
+export async function workerEmbedSingle(text: string, isQuery: boolean = false): Promise<Float32Array> {
+  const result = await sendRequest('EMBED_SINGLE', { text, isQuery });
   return new Float32Array(result.vector);
 }
 

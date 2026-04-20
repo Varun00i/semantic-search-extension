@@ -5,19 +5,21 @@ import type { TextChunk, ChunkingConfig } from '../types/index';
 
 /** Default chunking configuration */
 const DEFAULT_CONFIG: ChunkingConfig = {
-  chunkSize: 500,
-  chunkOverlap: 50,
-  minChunkSize: 50,
+  chunkSize: 300,
+  chunkOverlap: 60,
+  minChunkSize: 40,
 };
 
 /**
- * Split text into overlapping chunks, preserving sentence boundaries.
+ * Split text into overlapping chunks, preserving semantic boundaries.
  *
  * Strategy:
- * 1. Split text into sentences
- * 2. Group sentences into chunks of ~chunkSize characters
- * 3. Add overlap between consecutive chunks
- * 4. Filter out chunks smaller than minChunkSize
+ * 1. Split text into paragraphs (double newlines)
+ * 2. Detect section headers and treat them as chunk boundaries
+ * 3. Break large paragraphs into sentences
+ * 4. Group segments into chunks of ~chunkSize characters with overlap
+ * 5. Avoid overlap across section boundaries
+ * 6. Filter out chunks smaller than minChunkSize
  */
 export function chunkText(
   text: string,
@@ -29,74 +31,134 @@ export function chunkText(
 
   if (!text || text.trim().length === 0) return [];
 
-  // Split into sentences
-  const sentences = splitIntoSentences(text);
-  if (sentences.length === 0) return [];
+  // Split into semantic segments (paragraph-aware)
+  const segments = splitIntoSegments(text);
+  if (segments.length === 0) return [];
 
   const chunks: TextChunk[] = [];
   let currentChunk: string[] = [];
   let currentLength = 0;
   let chunkStartOffset = 0;
-  let sentenceOffset = 0;
+  let runningOffset = 0;
   let position = 0;
 
-  for (let i = 0; i < sentences.length; i++) {
-    const sentence = sentences[i];
-    const sentenceLen = sentence.length;
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    const isHeader = detectHeader(segment);
+    const segmentLen = segment.length;
 
-    // If adding this sentence exceeds chunk size, finalize the current chunk
-    if (currentLength + sentenceLen > chunkSize && currentChunk.length > 0) {
-      const chunkText = currentChunk.join(' ').trim();
+    // Section boundary: finalize current chunk before a header (no overlap)
+    if (isHeader && currentChunk.length > 0) {
+      const content = currentChunk.join(' ').trim();
+      if (content.length >= minChunkSize) {
+        chunks.push(buildChunk(documentId, content, position, chunkStartOffset));
+        position++;
+      }
+      currentChunk = [];
+      currentLength = 0;
+      chunkStartOffset = runningOffset;
+    }
 
-      if (chunkText.length >= minChunkSize) {
-        chunks.push({
-          id: `${documentId}_chunk_${position}`,
-          documentId,
-          text: chunkText,
-          position,
-          startOffset: chunkStartOffset,
-          endOffset: chunkStartOffset + chunkText.length,
-          preview: chunkText.substring(0, 120).trim() + (chunkText.length > 120 ? '…' : ''),
-        });
+    // If adding this segment exceeds chunk size, finalize current chunk
+    if (currentLength + segmentLen > chunkSize && currentChunk.length > 0) {
+      const content = currentChunk.join(' ').trim();
+      if (content.length >= minChunkSize) {
+        chunks.push(buildChunk(documentId, content, position, chunkStartOffset));
         position++;
       }
 
-      // Compute overlap: keep last few sentences that fit within chunkOverlap
-      const overlapSentences: string[] = [];
+      // Overlap: keep trailing segments that fit within chunkOverlap
+      const overlapSegments: string[] = [];
       let overlapLen = 0;
       for (let j = currentChunk.length - 1; j >= 0; j--) {
         if (overlapLen + currentChunk[j].length > chunkOverlap) break;
-        overlapSentences.unshift(currentChunk[j]);
+        overlapSegments.unshift(currentChunk[j]);
         overlapLen += currentChunk[j].length;
       }
 
-      chunkStartOffset = sentenceOffset - overlapLen;
-      currentChunk = [...overlapSentences];
+      chunkStartOffset = runningOffset - overlapLen;
+      currentChunk = [...overlapSegments];
       currentLength = overlapLen;
     }
 
-    currentChunk.push(sentence);
-    currentLength += sentenceLen;
-    sentenceOffset += sentenceLen + 1; // +1 for the space/separator
+    currentChunk.push(segment);
+    currentLength += segmentLen + 1;
+    runningOffset += segmentLen + 1;
   }
 
   // Finalize last chunk
   if (currentChunk.length > 0) {
-    const chunkText = currentChunk.join(' ').trim();
-    if (chunkText.length >= minChunkSize) {
-      chunks.push({
-        id: `${documentId}_chunk_${position}`,
-        documentId,
-        text: chunkText,
-        position,
-        startOffset: chunkStartOffset,
-        endOffset: chunkStartOffset + chunkText.length,
-        preview: chunkText.substring(0, 120).trim() + (chunkText.length > 120 ? '…' : ''),
-      });
+    const content = currentChunk.join(' ').trim();
+    if (content.length >= minChunkSize) {
+      chunks.push(buildChunk(documentId, content, position, chunkStartOffset));
     }
   }
 
   return chunks;
+}
+
+/** Build a TextChunk object. */
+function buildChunk(documentId: string, text: string, position: number, startOffset: number): TextChunk {
+  return {
+    id: `${documentId}_chunk_${position}`,
+    documentId,
+    text,
+    position,
+    startOffset,
+    endOffset: startOffset + text.length,
+    preview: text.substring(0, 120).trim() + (text.length > 120 ? '…' : ''),
+  };
+}
+
+/**
+ * Split text into semantic segments: paragraphs first, then sentences
+ * for large paragraphs. Preserves document structure better than flat
+ * sentence splitting.
+ */
+function splitIntoSegments(text: string): string[] {
+  if (!text) return [];
+
+  // Split by paragraph breaks (2+ newlines)
+  const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(p => p.length > 0);
+  const segments: string[] = [];
+
+  for (const para of paragraphs) {
+    // Short paragraphs stay as one segment (preserves meaning)
+    if (para.length <= 500) {
+      segments.push(para.replace(/\s+/g, ' ').trim());
+    } else {
+      // Break long paragraphs into sentences
+      const sentences = splitIntoSentences(para);
+      segments.push(...sentences);
+    }
+  }
+
+  return segments.filter(s => s.length > 5);
+}
+
+/**
+ * Detect whether a text segment is likely a section header.
+ * Headers are kept as chunk boundaries to preserve document structure.
+ */
+function detectHeader(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length === 0 || trimmed.length > 120) return false;
+
+  // Must be short and NOT end with sentence-ending punctuation
+  if (trimmed.length < 80 && !/[.!?,;]$/.test(trimmed)) {
+    // ALL CAPS text
+    if (trimmed === trimmed.toUpperCase() && /[A-Z]/.test(trimmed)) return true;
+    // Numbered headings (e.g., "1. Introduction", "2) Methods")
+    if (/^\d+[.)]\s/.test(trimmed)) return true;
+    // Title case: short line where most words are capitalized
+    const words = trimmed.split(/\s+/);
+    if (words.length >= 2 && words.length <= 8) {
+      const capitalized = words.filter(w => /^[A-Z]/.test(w)).length;
+      if (capitalized / words.length >= 0.6) return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -106,16 +168,15 @@ export function chunkText(
 export function splitIntoSentences(text: string): string[] {
   if (!text) return [];
 
-  // Normalize whitespace
+  // Normalize whitespace within the segment
   const normalized = text.replace(/\s+/g, ' ').trim();
 
-  // Split on sentence-ending punctuation followed by space and uppercase letter
-  // Also split on newlines that separate paragraphs
-  const raw = normalized.split(/(?<=[.!?])\s+(?=[A-Z])|(?:\n\s*\n)/);
+  // Split on sentence-ending punctuation followed by space and capital letter
+  const raw = normalized.split(/(?<=[.!?])\s+(?=[A-Z"])/);
 
   return raw
     .map(s => s.trim())
-    .filter(s => s.length > 0);
+    .filter(s => s.length > 5); // Filter out very short fragments
 }
 
 /**

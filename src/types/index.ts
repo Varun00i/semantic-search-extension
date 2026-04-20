@@ -93,6 +93,8 @@ export interface SearchConfig {
   searchAllDocuments: boolean;
   /** Specific document IDs to search within (if not searching all) */
   documentIds?: string[];
+  /** Original query text for hybrid keyword scoring */
+  queryText?: string;
 }
 
 /** Configuration for the embedding engine */
@@ -126,6 +128,8 @@ export interface AppSettings {
   autoIndex: boolean;
   /** Maximum number of documents to keep in cache */
   maxCachedDocuments: number;
+  /** Whether dark mode is enabled */
+  darkMode: boolean;
 }
 
 /** Default application settings */
@@ -137,17 +141,18 @@ export const DEFAULT_SETTINGS: AppSettings = {
     embeddingDimension: 384,
   },
   chunking: {
-    chunkSize: 500,
-    chunkOverlap: 50,
-    minChunkSize: 50,
+    chunkSize: 300,
+    chunkOverlap: 60,
+    minChunkSize: 40,
   },
   search: {
-    maxResults: 20,
-    minScore: 0.25,
+    maxResults: 15,
+    minScore: 0.3,
     searchAllDocuments: true,
   },
   autoIndex: false,
   maxCachedDocuments: 100,
+  darkMode: true,
 };
 
 // ============================================================

@@ -10,6 +10,7 @@ let extractor: any = null;
 /** Current model status */
 let modelStatus: ModelStatus = 'not-loaded';
 let loadProgress = 0;
+let currentModelId = '';
 
 /** Default model configuration */
 const DEFAULT_CONFIG: EmbeddingConfig = {
@@ -67,9 +68,10 @@ export async function initializeModel(
 
     onProgress?.(0.1, `Loading model: ${cfg.modelId}...`);
 
-    // Create feature extraction pipeline
+    // Create feature extraction pipeline with explicit dtype to suppress warning
     extractor = await pipeline('feature-extraction', cfg.modelId, {
       quantized: cfg.quantized,
+      dtype: 'q8',
       progress_callback: (data: any) => {
         if (data.status === 'progress' && data.progress) {
           loadProgress = 0.1 + (data.progress / 100) * 0.85;
@@ -80,6 +82,7 @@ export async function initializeModel(
 
     loadProgress = 1;
     modelStatus = 'ready';
+    currentModelId = cfg.modelId;
     onProgress?.(1, 'Model loaded successfully');
   } catch (error) {
     modelStatus = 'error';
@@ -94,16 +97,16 @@ export async function initializeModel(
  * Generate embedding vector for a single text string.
  * Returns a Float32Array of size embeddingDimension (default 384).
  */
-export async function generateEmbedding(text: string): Promise<Float32Array> {
+export async function generateEmbedding(text: string, isQuery: boolean = false): Promise<Float32Array> {
   if (!extractor || modelStatus !== 'ready') {
     throw new Error('Model not initialized. Call initializeModel() first.');
   }
 
-  // Truncate text if too long
-  const truncated = text.substring(0, 1024);
+  // Truncate to max token limit
+  let inputText = text.substring(0, 512);
 
   // Run inference
-  const output = await extractor(truncated, {
+  const output = await extractor(inputText, {
     pooling: 'mean',
     normalize: true,
   });
@@ -161,4 +164,5 @@ export async function unloadModel(): Promise<void> {
   extractor = null;
   modelStatus = 'not-loaded';
   loadProgress = 0;
+  currentModelId = '';
 }

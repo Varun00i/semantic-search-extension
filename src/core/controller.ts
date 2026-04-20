@@ -192,16 +192,20 @@ export async function search(
     await initializeModel();
   }
 
-  // Generate query embedding
-  const queryVector = await generateEmbedding(query);
+  // Preprocess query: normalize whitespace, trim
+  const cleanQuery = query.replace(/\s+/g, ' ').trim();
+  if (!cleanQuery) return { results: [], searchTimeMs: 0 };
 
-  // Search for similar embeddings
-  const results = await searchSimilar(queryVector, config);
+  // Generate query embedding (with query instruction prefix for BGE models)
+  const queryVector = await generateEmbedding(cleanQuery, true);
+
+  // Search for similar embeddings (pass query text for hybrid keyword boost)
+  const results = await searchSimilar(queryVector, { ...config, queryText: cleanQuery });
 
   // Highlight results
   const highlighted = results.map(r => ({
     ...r,
-    highlightedText: highlightResult(r.text, query),
+    highlightedText: highlightResult(r.text, cleanQuery),
   }));
 
   const searchTimeMs = Math.round(performance.now() - startTime);

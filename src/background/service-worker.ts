@@ -205,12 +205,30 @@ async function handleMessage(
     }
 
     case 'NAVIGATE_TO_CHUNK': {
-      // Forward to content script for highlighting
+      // Forward to content script for highlighting — wait for actual result
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id) {
-        await chrome.tabs.sendMessage(tab.id, message);
+      if (!tab?.id) return { success: false, message: 'No active tab' };
+
+      // Ensure content script is injected
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['src/content/content-script.js'],
+        });
+      } catch {
+        // May already be injected
       }
-      return { success: true };
+      await new Promise(r => setTimeout(r, 50));
+
+      try {
+        const result = await chrome.tabs.sendMessage(tab.id, {
+          type: 'NAVIGATE_TO_CHUNK',
+          payload: message.payload,
+        });
+        return result || { success: true };
+      } catch (err) {
+        return { success: false, message: 'Could not communicate with page' };
+      }
     }
 
     default:
@@ -276,6 +294,60 @@ chrome.contextMenus?.onClicked.addListener(async (info, tab) => {
         payload: { query: info.selectionText },
       });
     }, 500);
+  }
+});
+
+// ---- Auto-Index on Page Navigation ----
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  // Only trigger when a page finishes loading
+  if (changeInfo.status !== 'complete') return;
+  if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) return;
+
+  try {
+    const result = await chrome.storage.local.get('settings');
+    const autoIndex = result.settings?.autoIndex ?? false;
+    if (!autoIndex) return;
+
+    // Check if this URL is already indexed
+    const docCheck = await sendToOffscreen({
+      type: 'OFFSCREEN_GET_DOCUMENTS',
+    });
+    const docs = docCheck?.payload?.documents || docCheck?.documents || docCheck || [];
+    const alreadyIndexed = Array.isArray(docs) && docs.some((d: any) => d.url === tab.url);
+    if (alreadyIndexed) return;
+
+    console.log('[SemanticSearch] Auto-indexing:', tab.url);
+
+    // Inject content script
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['src/content/content-script.js'],
+      });
+    } catch { /* already injected */ }
+
+    await new Promise(r => setTimeout(r, 300));
+
+    // Extract text
+    const extractResult = await chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_TEXT' });
+    if (!extractResult?.payload?.text) return;
+
+    // Index it
+    await sendToOffscreen({
+      type: 'OFFSCREEN_INDEX',
+      payload: {
+        content: extractResult.payload.text,
+        title: extractResult.payload.title || tab.title || 'Untitled',
+        url: extractResult.payload.url || tab.url || '',
+        sourceType: 'webpage',
+      },
+    });
+
+    console.log('[SemanticSearch] Auto-indexed:', tab.title);
+  } catch (err) {
+    // Silently fail — auto-index is best-effort
+    console.warn('[SemanticSearch] Auto-index failed:', err);
   }
 });
 

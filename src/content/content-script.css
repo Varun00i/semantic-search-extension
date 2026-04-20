@@ -1,18 +1,28 @@
 /* Content script styles for semantic search highlights */
 .semantic-search-highlight {
-  background-color: #fef08a !important;
-  color: #000 !important;
-  padding: 2px 0 !important;
+  background-color: #e9d5ff !important;
+  color: #581c87 !important;
+  padding: 1px 0 !important;
   border-radius: 2px !important;
-  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.4) !important;
-  transition: background-color 0.3s ease !important;
+  box-shadow: none !important;
+  border-bottom: 2px solid #c084fc !important;
+  transition: background-color 0.2s ease !important;
+  font-weight: inherit !important;
+  display: inline !important;
+  line-height: inherit !important;
 }
 
 .semantic-search-highlight:hover {
-  background-color: #fde047 !important;
+  background-color: #d8b4fe !important;
 }
 
 .semantic-search-highlight--active {
-  background-color: #fb923c !important;
-  box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.5) !important;
+  background-color: #c084fc !important;
+  color: #fff !important;
+  border-bottom-color: #9333ea !important;
+  animation: semantic-search-pulse 1.5s ease-in-out 2 !important;
 }
+
+@keyframes semantic-search-pulse {
+  0%, 100% { background-color: #c084fc; }
+  50% { background-color: #a855f7; }
